@@ -24,32 +24,11 @@
 
 interface Promise<T> {
 	/**
-	 * @param {function(T):U} fulfilledHandler
-	 * @param {?function(*):U} rejectedHandler
+	 * @param {function(T):(U|Promise.<U>)} fulfilledHandler
+	 * @param {?function(*):(U|Promise.<U>)} rejectedHandler
 	 * @return {!Promise.<U>}
 	 */
-	then<U>(fulfilledHandler: (value: T) => U, rejectedHandler?: (reason: any) => U): Promise<U>;
-
-	/**
-	 * @param {function(T):!Promise.<U>} fulfilledHandler
-	 * @param {?function(*):!Promise.<U>} rejectedHandler
-	 * @return {!Promise.<U>}
-	 */
-	then<U>(fulfilledHandler: (value: T) => Promise<U>, rejectedHandler?: (reason: any) => Promise<U>): Promise<U>;
-
-	/**
-	 * @param {function(T):U} fulfilledHandler
-	 * @param {?function(*):!Promise.<U>} rejectedHandler
-	 * @return {!Promise.<U>}
-	 */
-	then<U>(fulfilledHandler: (value: T) => U, rejectedHandler?: (reason: any) => Promise<U>): Promise<U>;
-
-	/**
-	 * @param {function(T):!Promise.<U>} fulfilledHandler
-	 * @param {?function(*):U} rejectedHandler
-	 * @return {!Promise.<U>}
-	 */
-	then<U>(fulfilledHandler: (value: T) => Promise<U>, rejectedHandler?: (reason: any) => U): Promise<U>;
+	then<U>(fulfilledHandler: (value: T) => U | Promise<U>, rejectedHandler?: (reason: any) => U | Promise<U>): Promise<U>;
 }
 
 interface Global {
@@ -353,7 +332,7 @@ module libjass {
 		private _alreadyFulfilledValue: T = null;
 		private _alreadyRejectedReason: any = null;
 
-		constructor(private _resolver: (resolve: (value: T) => void, reject: (reason: any) => void) => void) {
+		constructor(private _resolver: (resolve: (value: T | Promise<T>) => void, reject: (reason: any) => void) => void) {
 			try {
 				_resolver(value => this._resolve(value), reason => this._reject(reason));
 			}
@@ -367,7 +346,7 @@ module libjass {
 		 * @param {?function(*):(U|Promise.<U>)} rejectedHandler
 		 * @return {!Promise.<U>}
 		 */
-		then<U>(fulfilledHandler: (value: T) => U, rejectedHandler: (reason: any) => U): Promise<U> {
+		then<U>(fulfilledHandler: (value: T) => U | Promise<U>, rejectedHandler?: (reason: any) => U | Promise<U>): Promise<U> {
 			fulfilledHandler = (typeof fulfilledHandler === "function") ? fulfilledHandler : null;
 			rejectedHandler = (typeof rejectedHandler === "function") ? rejectedHandler : null;
 
@@ -487,24 +466,24 @@ module libjass {
 		}
 
 		/**
-		 * @param {T} value
+		 * @param {T|Promise.<T>} value
 		 */
-		private _resolve(value: T): void {
+		private _resolve(value: T | Promise<T>): void {
 			var alreadyCalled = false;
 
 			try {
-				if (<any>value === this) {
+				if (value === this) {
 					throw new TypeError("2.3.1");
 				}
 
 				var thenMethod = SimplePromise._getThenMethod<T>(value);
 				if (thenMethod === null) {
-					this._fulfill(value);
+					this._fulfill(<T>value);
 					return;
 				}
 
 				thenMethod.call(
-					<Promise<T>><any>value,
+					<Promise<T>>value,
 					(value: T) => {
 						if (alreadyCalled) {
 							return;
